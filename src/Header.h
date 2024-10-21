@@ -9,6 +9,7 @@
 #include <queue>
 #include <random>
 
+
 #include <chrono>
 #include <iostream> // cin, cout
 
@@ -81,8 +82,8 @@ struct sDbscanParam
     int minPts;
     int n_proj;
     int n_threads;
-    int topM;
-    int topK;
+    int topPoints;
+    int topVectors;
     float ker_sigma;
     int ker_n_features;
     float ker_intervalSampling;

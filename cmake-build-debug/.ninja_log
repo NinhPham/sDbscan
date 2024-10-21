@@ -1,15 +1,13 @@
 # ninja log v5
 3418	3573	1716854570111594898	Dbscan	fa7a1b8553bea2dc
-2	1701	1716635327761349991	CMakeFiles/sDbscan.dir/src/main.cpp.o	57a28267ceeda9bb
-0	23	1717154846666394531	build.ninja	4f6ab05f7a7e3e1d
-3502	3800	1716635329857353652	sDbscan	346874a4a21d7a82
-2	176	1716337517167857187	CMakeFiles/sDbscan.dir/src/fast_copy.c.o	ff242be25648c5c7
-2	403	1716337517395857359	CMakeFiles/sDbscan.dir/src/fht.c.o	a6004711eae45fd2
-1	3284	1716635271337256731	CMakeFiles/sDbscan.dir/src/sDbscan.cpp.o	e16d4a15b7878f21
-4	3200	1716620866078465510	CMakeFiles/sDbscan.dir/src/Utilities.cpp.o	17a7c0ae9b742ff9
+0	2098	1717154850786416224	CMakeFiles/sDbscan.dir/src/main.cpp.o	957c794bc9afdbcd
+0	23	1725234513737845824	build.ninja	4f6ab05f7a7e3e1d
+7390	7521	1717154856210444777	sDbscan	fd46d897196976e7
 1	177	1717154848870406137	CMakeFiles/sDbscan.dir/src/fast_copy.c.o	3a4d04d4255acf4d
 178	615	1717154849306408432	CMakeFiles/sDbscan.dir/src/fht.c.o	1d3f7601f0c7274
-0	2098	1717154850786416224	CMakeFiles/sDbscan.dir/src/main.cpp.o	957c794bc9afdbcd
-0	4251	1717154852938427554	CMakeFiles/sDbscan.dir/src/Utilities.cpp.o	ab51b9c7e750b781
 1	7390	1717154856074444061	CMakeFiles/sDbscan.dir/src/sDbscan.cpp.o	e8c772cc067f6726
-7390	7521	1717154856210444777	sDbscan	fd46d897196976e7
+0	4251	1717154852938427554	CMakeFiles/sDbscan.dir/src/Utilities.cpp.o	ab51b9c7e750b781
+2	1979	1725404467703605370	CMakeFiles/sDbscan.dir/src/main.cpp.o	957c794bc9afdbcd
+2	4042	1725404469763564464	CMakeFiles/sDbscan.dir/src/Utilities.cpp.o	ab51b9c7e750b781
+2	7097	1725404472807504019	CMakeFiles/sDbscan.dir/src/sDbscan.cpp.o	e8c772cc067f6726
+7097	7225	1725404472951501159	sDbscan	fd46d897196976e7

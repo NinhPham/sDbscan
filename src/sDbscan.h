@@ -19,14 +19,14 @@ protected:
     int n_features;
 
     int n_proj = 1024; // default
-    int topK = 5; // default
+    int topK = 10; // default
     int topM = 50; // default
 
     int n_threads = 8;
 
     float ker_sigma = 1.0;
     int ker_n_features = 1024;
-    float ker_intervalSampling = 0.4;
+    float ker_intervalSampling = 0.4; // used in Chi2 and JS features
     float samplingProb = 0.01; // use for sngDbscan and sDbscan-1NN
 
     bool verbose = false;
@@ -35,13 +35,16 @@ protected:
     string distance = "Cosine";
     int seed = -1;
 
+    // Only for testing
+    int n_tests = 5;
+
     // Need to store it for sDbscan-1NN
     boost::dynamic_bitset<> bitHD3;
 
 
     // for Fourier embedding on L1 and L2
     // Need to store it for sDbscan-1NN with L1 and L2
-    // Chi^2 and JS do not need as its embeddings are deterministic
+    // Chi^2 and JS do not need as its embeddings are deterministic given fix ker_n_features
     MatrixXf matrix_R;
 
     MatrixXi matrix_topK; // For each point (each col), keep topK closest/furthest random vectors
@@ -73,15 +76,15 @@ public:
     }
 
     void set_params(int numProj = 1024, int k = 5, int m = 50, string dist = "Cosine",
-                   int kDim = 1024, float kSigma = 1.0, float kSam = 0.4, float prob = 0.01, int noiseClustering = 0,
+                   int kerDim = 1024, float kerSigma = 1.0, float kerSam = 0.4, float prob = 0.01, int noiseClustering = 0,
                    bool ver = false, int numThreads = 8, int randomSeed = -1, string filename = ""){
         n_proj = numProj;
         topK = k;
         topM = m;
         distance = dist;
-        ker_n_features = kDim;
-        ker_sigma = kSigma;
-        ker_intervalSampling = kSam;
+        ker_n_features = kerDim;
+        ker_sigma = kerSigma;
+        ker_intervalSampling = kerSam;
         samplingProb = prob;
         clusterNoise = noiseClustering;
         verbose = ver;
@@ -91,31 +94,16 @@ public:
         seed = randomSeed;
         output = filename;
 
-        // Must set
+        // Cosine does not need kernel embeddings
         if (distance == "Cosine") {
             ker_n_features = n_features;
         }
 
-        // have to set fhtDim
-        if (distance == "Cosine")
-        {
-            // Must set
-            ker_n_features = n_features;
-
-            if (n_proj <= n_features)
-                fhtDim = 1 << int(ceil(log2(n_features)));
-            else
-                fhtDim = 1 << int(ceil(log2(n_proj)));
-        }
-        else // the rest uses kernel embedding
-        {
-            if (n_proj <= ker_n_features)
-                fhtDim = 1 << int(ceil(log2(ker_n_features)));
-            else
-                fhtDim = 1 << int(ceil(log2(n_proj)));
-        }
+        // Note that: We do not implement FHT for L2 random features
+        fhtDim = 1 << int(ceil(log2(max(n_proj, ker_n_features))));
     }
 
+    // We provide our own sngDbscan
     void set_sngParams(string dist = "Cosine", float prob = 0.01, int noiseClustering = 0,
                       bool ver = false, int numThreads = -1, int randomSeed = -1, string filename = ""){
 
@@ -172,15 +160,15 @@ public:
     void fit_sDbscan(const Ref<const MatrixXf> &, float, int);
     void load_fit_sDbscan(const string&, float, int );
 
-    // Test with eps-base, and eps-range
-    void test_sDbscan(const Ref<const MatrixXf> &, float, float, int);
-    void load_test_sDbscan(const string&, float, float, int);
+    // Test with eps-base and eps-range with 5 values: eps-base + i * eps-range
+    void test_sDbscan(const Ref<const MatrixXf> &, float, float, int, int);
+    void load_test_sDbscan(const string&, float, float, int, int);
 
     void fit_sngDbscan(const Ref<const MatrixXf> &, float, int);
 
-    // Test with eps-base, and eps-range
-    void test_sngDbscan(const Ref<const MatrixXf> &, float, float, int);
-    void load_test_sngDbscan(const string&, float, float, int);
+    // Test with eps-base and eps-range with 5 values: eps-base + i * eps-range
+    void test_sngDbscan(const Ref<const MatrixXf> &, float, float, int, int);
+    void load_test_sngDbscan(const string&, float, float, int, int);
 
     // Optics
     void fit_sOptics(const Ref<const MatrixXf> &, float , int);
@@ -191,12 +179,12 @@ public:
 
 private:
 
-    // TODO: add build kernel features as a function
-//    void buildKernelFeatures();
+    // TODO: add build kernel features as a stand-alone function
     void rp_parIndex();
 
-protected:
+    // TODO: Replace fht by inline fht in Utilities.h
 
+protected:
 
     void formOptics_scikit();
 
@@ -207,8 +195,7 @@ protected:
     void sng_findCoreDist( float  ,  int  );
 
     void formCluster(); // TODO: sngDbscan: create subgraphs of approximate neighbors and connect them all together
-    void labelNoise();
-
+    void labelNoise(); // There are 2 options to label noise
 
 };
 

@@ -17,7 +17,7 @@
 void sDbscan::rp_parIndex()
 {
     /** Param for embedding L1 and L2 **/
-    int iFourierEmbed_D = sDbscan::ker_n_features / 2; // This is becase we need cos() and sin()
+    int iFourierEmbed_D = sDbscan::ker_n_features / 2; // This is because we need cos() and sin()
 
     // See: https://github.com/hichamjanati/srf/blob/master/RFF-I.ipynb
     if (sDbscan::distance == "L1")
@@ -29,10 +29,11 @@ void sDbscan::rp_parIndex()
     MatrixXf MATRIX_FHT = MatrixXf::Zero(sDbscan::n_proj, sDbscan::n_points);
 
     int log2Project = log2(sDbscan::fhtDim);
-    bitHD3Generator(sDbscan::fhtDim * sDbscan::n_rotate, sDbscan::bitHD3, sDbscan::seed);
+    bitHD3Generator(sDbscan::fhtDim * sDbscan::n_rotate, sDbscan::seed, sDbscan::bitHD3);
 
     /** Param for index **/
-    sDbscan::matrix_topK = MatrixXi::Zero(2 * sDbscan::topK, sDbscan::n_points); // the first topK is for close, the second topK is for far away
+    // the first topK is for close vectors, the second topK is for far away vectors
+    sDbscan::matrix_topK = MatrixXi::Zero(2 * sDbscan::topK, sDbscan::n_points);
 
     // omp_set_dynamic(0);     // Explicitly disable dynamic teams
 //    omp_set_num_threads(sDbscan::n_threads); // already set it outside
@@ -48,9 +49,9 @@ void sDbscan::rp_parIndex()
         TODO: create buildKernelFeatures and random projection as a new function since sDbscan-1NN also use it
         **/
         VectorXf vecX = sDbscan::matrix_X.col(n);
-        VectorXf vecEmbed = VectorXf::Zero(sDbscan::ker_n_features); // sDbscan::ker_n_features >= D
+        VectorXf vecEmbed = VectorXf::Zero(sDbscan::ker_n_features); // sDbscan::ker_n_features >= n_features
 
-        // NOTE: must ensure ker_n_features = n_features on Cosine
+        // NOTE: Already ensure ker_n_features = n_features on Cosine when initializing the object
         if (sDbscan::distance == "Cosine")
             vecEmbed.segment(0, sDbscan::n_features) = vecX;
         else if ((sDbscan::distance == "L1") || (sDbscan::distance == "L2"))
@@ -60,15 +61,15 @@ void sDbscan::rp_parIndex()
             vecEmbed.segment(iFourierEmbed_D, iFourierEmbed_D) = vecProject.array().sin(); // start from iEmbbed, copy iEmbed elements
         }
         else if (sDbscan::distance == "Chi2")
-            embedChi2(vecX, vecEmbed, sDbscan::ker_n_features, sDbscan::n_features, sDbscan::ker_intervalSampling);
+            embedChi2(vecX, sDbscan::ker_n_features, sDbscan::n_features, sDbscan::ker_intervalSampling, vecEmbed);
         else if (sDbscan::distance == "JS")
-            embedJS(vecX, vecEmbed, sDbscan::ker_n_features, sDbscan::n_features, sDbscan::ker_intervalSampling);
+            embedJS(vecX, sDbscan::ker_n_features, sDbscan::n_features, sDbscan::ker_intervalSampling, vecEmbed);
 
         /**
         Random projection
         **/
 
-        VectorXf vecRotation = VectorXf::Zero(sDbscan::fhtDim); // NUM_PROJECT > PARAM_KERNEL_EMBED_D
+        VectorXf vecRotation = VectorXf::Zero(sDbscan::fhtDim); // n_proj > ker_n_features
         vecRotation.segment(0, sDbscan::ker_n_features) = vecEmbed;
 
         for (int r = 0; r < sDbscan::n_rotate; ++r)
@@ -95,7 +96,7 @@ void sDbscan::rp_parIndex()
 
         for (int d = 0; d < sDbscan::n_proj; ++d)
         {
-            float fValue = vecRotation(d); // take the value up to n_proj
+            float fValue = vecRotation(d); // take the value up to n_proj - it might be safer to use MATRIX_FHT.col(n)
 
             /**
             1) For each random vector Ri, get top-MinPts closest index and top-MinPts furthest index
@@ -212,13 +213,19 @@ void sDbscan::rp_parIndex()
  */
 void sDbscan::rp_findCorePoints(float eps, int minPts)
 {
+    // Space and time overheads of unordered_set<int> are significant compared to vector since we only has approximate 2km neighbors
+    // In case we add x to q's neighbor, and q to x's neighbor, # neighbors > 2km
     sDbscan::vec2D_Neighbors = vector<IVector> (sDbscan::n_points, IVector());
-    //    vector<unordered_set<int>> set2D_sDbscan_Neighbor(PARAM_DATA_N, unordered_set<int>()); // Space and time overheads are significant compared to vector
 
+    // bitset work since # core points tend to be relatively large compared to n_points
     sDbscan::bit_CorePoints = boost::dynamic_bitset<>(sDbscan::n_points);
 
 //    chrono::steady_clock::time_point begin;
 //    begin = chrono::steady_clock::now();
+
+    // Initialize the OPENMP lock
+//    omp_lock_t ompLock;
+//    omp_init_lock(&ompLock);
 
     //TODO: If single thread, then we can improve if we store (X1, X2) s.t. <X1,X2> >= threshold
 
@@ -228,16 +235,15 @@ void sDbscan::rp_findCorePoints(float eps, int minPts)
     for (int n = 0; n < sDbscan::n_points; ++n)
     {
         // Get top-k closese/furthest vectors
-//        VectorXf vecXn = sDbscan::matrix_X.col(n);
         VectorXf vecXn = sDbscan::matrix_X.col(n);
-
         VectorXi vecTopK = sDbscan::matrix_topK.col(n); // size 2K: first K is close, last K is far
 
-
         /**
-        Choice of data structure: We are using bitSet of size N bits
-        If using vector: It will be faster for 2k * m * 32 (4 bytes) << N (bits)
-        If using unorder_set or set: It will be faster for 2k * m * 36 * 8 (36 bytes) << N (bits)
+        Choice of data structure: We are using bitSet of size N bits to avoid duplicate distance computation
+        If using vector: 2k * m * 32 (32 bits / element) << N (bits)
+        If using unorder_set or set: 2k * m * 36 * 8 (36 bytes / element) << N (bits)
+        N = 1M, k = 10, m = 100, then bitSet seems to be okie regarding space complexity
+        For Optics, bitset will be more useful if using larger k and m
         **/
 //        IVector vecNeighborhood;
 //        unordered_set<int> approxNeighbor;
@@ -266,15 +272,18 @@ void sDbscan::rp_findCorePoints(float eps, int minPts)
 
                     float fDist = computeDist(vecXn, sDbscan::matrix_X.col(iPointIdx), sDbscan::distance);
 
+		     // We need to store both (x1,x2) and (x2, x1) to increase the neighborhood. Otherwise, some core points are missed classified as border points.
+		     // Hence, a big cluster will be broken into several small clusters if missing some connected core points
                     if (fDist <= eps)
                     {
 #pragma omp critical
                         {
 //                        set2D_Dbscan_Neighbor[n].insert(iPointIdx);  // set is very slow and take much memory
 //                        set2D_Dbscan_Neighbor[iPointIdx].insert(n);
-
+//                            omp_set_lock(&ompLock);
                             vec2D_Neighbors[n].push_back(iPointIdx); // allow duplicate, at most double so vector is much faster than set()
                             vec2D_Neighbors[iPointIdx].push_back(n); // e.g. 1 = {3, 5}, and 3 = {1 6}
+//                            omp_unset_lock(&ompLock);
                         }
                     }
 
@@ -305,9 +314,13 @@ void sDbscan::rp_findCorePoints(float eps, int minPts)
                     {
                         // TODO: We might need asymmetric update vec2D_Neighbors to increase parallel capacity
                         // TODO: GPUs version might not suffer it
+
+                        // https://stackoverflow.com/questions/33441767/difference-between-omp-critical-and-omp-single
 #pragma omp critical
                         {
-//                        set2D_DBSCAN_Neighbor[n].insert(iPointIdx);  // set is very slow, and the overhead is large
+                        // set is very slow de to larger memory which is bottleneck on multi-threading
+                        // Note that the collision rate is not large, and the size of vector is << 2km 
+//                        set2D_DBSCAN_Neighbor[n].insert(iPointIdx);  
 //                        set2D_DBSCAN_Neighbor[iPointIdx].insert(n);
 
                             vec2D_Neighbors[n].push_back(iPointIdx);
@@ -320,6 +333,8 @@ void sDbscan::rp_findCorePoints(float eps, int minPts)
 
 //        cout << "Number of used distances for the point of " << n << " is: " << approxNeighbor.size() << endl;
     }
+
+//    omp_destroy_lock(&ompLock);
 
 //    if (sDbscan::verbose)
 //        cout << "Find neighborhood time = " << chrono::duration_cast<chrono::milliseconds>(chrono::steady_clock::now() - begin).count() << "[ms]" << endl;
@@ -337,7 +352,7 @@ void sDbscan::rp_findCorePoints(float eps, int minPts)
         vec2D_Neighbors[n].clear();
 
         // Decide core points
-        if ((int)setNeighbor.size() >= minPts - 1)
+        if ((int)setNeighbor.size() >= minPts - 1) // we count the point itself
         {
             bit_CorePoints[n] = true;
 
@@ -509,6 +524,8 @@ void sDbscan::formCluster()
 //        connectedPoints.insert(n);
         **/
 
+	// We use bitset for large data since the cluster size tends to be large
+	// If the cluster size is tiny or number of cluster is large, then unordered_set might be faster
         boost::dynamic_bitset<> connectedPoints(sDbscan::n_points);
         connectedPoints[n] = true;
 
@@ -642,7 +659,7 @@ void sDbscan::labelNoise()
     {
         // First we get vector of sampled core points
 
-        IVector vecCore;
+        IVector vecSampledCore;
         int iNumCore = sDbscan::bit_CorePoints.count();
 
         /**
@@ -658,17 +675,17 @@ void sDbscan::labelNoise()
         {
             // Store the core point Idx
             if (fProb == 1.0)
-                vecCore.push_back(Xi);
+                vecSampledCore.push_back(Xi);
             else if (rand() / (RAND_MAX + 1.) <= fProb)
-                vecCore.push_back(Xi);
+                vecSampledCore.push_back(Xi);
 
             Xi = bit_CorePoints.find_next(Xi);
         }
 
         /** Compute again their random projections **/
-        iNumCore = vecCore.size();
+        iNumCore = vecSampledCore.size(); // now it is sampled core points
         if (sDbscan::verbose)
-            cout << "Number of sampled core points: " << vecCore.size() << endl;
+            cout << "Number of sampled core points: " << vecSampledCore.size() << endl;
 
         MatrixXf matCoreEmbeddings = MatrixXf::Zero(iNumCore, sDbscan::n_proj);
 
@@ -678,9 +695,9 @@ void sDbscan::labelNoise()
 
 //    omp_set_num_threads(sDbscan::n_threads); // already set outside
 #pragma omp parallel for
-        for (int i = 0; i < iNumCore; ++i)
+        for (int i = 0; i < iNumCore; ++i) // iNumCore is number of sampled core points
         {
-            int Xi = vecCore[i];
+            int Xi = vecSampledCore[i];
 
             /**
             Random embedding
@@ -697,9 +714,9 @@ void sDbscan::labelNoise()
                 vecEmbed.segment(iFourierEmbed_D, iFourierEmbed_D) = vecProject.array().sin(); // start from iEmbbed, copy iEmbed elements
             }
             else if (sDbscan::distance == "Chi2")
-                embedChi2(vecX, vecEmbed, sDbscan::ker_n_features, sDbscan::n_features, sDbscan::ker_intervalSampling);
+                embedChi2(vecX, sDbscan::ker_n_features, sDbscan::n_features, sDbscan::ker_intervalSampling, vecEmbed);
             else if (sDbscan::distance == "JS")
-                embedJS(vecX, vecEmbed, sDbscan::ker_n_features, sDbscan::n_features, sDbscan::ker_intervalSampling);
+                embedJS(vecX, sDbscan::ker_n_features, sDbscan::n_features, sDbscan::ker_intervalSampling, vecEmbed);
 
             /**
             Random projection
@@ -736,23 +753,25 @@ void sDbscan::labelNoise()
 
             for (int k = 0; k < sDbscan::topK; ++k)
             {
-                int closeRi = vecRandom(k);
-                vecDotEst += matCoreEmbeddings.col(closeRi);
+//                int closeRi = vecRandom(k);
+                vecDotEst += matCoreEmbeddings.col(vecRandom(k));
 
-                int farRi = vecRandom(k + sDbscan::topK);
-                vecDotEst -= matCoreEmbeddings.col(farRi);
+//                int farRi = vecRandom(k + sDbscan::topK);
+                vecDotEst -= matCoreEmbeddings.col(vecRandom(k + sDbscan::topK));
             }
+
+            // Eigen::VectorXf::Index max_index;
+            // vecDotEst.maxCoeff(&max_index);
 
             int iCoreIdx = -1;
             float best_so_far = NEG_INF;
 
             for (int i = 0; i < iNumCore; ++i)
             {
-                float fEst = vecDotEst(i);
-                if (fEst > best_so_far)
+                if (vecDotEst(i) > best_so_far)
                 {
-                    best_so_far = fEst;
-                    iCoreIdx = vecCore[i];
+                    best_so_far = vecDotEst(i);
+                    iCoreIdx = vecSampledCore[i];
                 }
             }
 
@@ -927,13 +946,15 @@ void sDbscan::load_fit_sDbscan(const string& dataset, float eps, int minPts)
  *
  * @param MATRIX_X
  * @param eps
- * @param rangeEps: We repeat 5 times, each use eps + i * rangeEps
+ * @param rangeEps: We repeat n_tests times, each use eps + i * rangeEps
+ * @param n_tests
  * @param minPts
  */
-void sDbscan::test_sDbscan(const Ref<const MatrixXf> & MATRIX_X, float eps, float rangeEps, int minPts)
+void sDbscan::test_sDbscan(const Ref<const MatrixXf> & MATRIX_X, float eps, float rangeEps, int n_tests, int minPts)
 {
     cout << "base eps: " << eps << endl;
     cout << "range eps: " << rangeEps << endl;
+    cout << "n_tests: " << n_tests << endl;
     cout << "minPts: " << minPts << endl;
 
     cout << "n_points: " << sDbscan::n_points << endl;
@@ -962,9 +983,8 @@ void sDbscan::test_sDbscan(const Ref<const MatrixXf> & MATRIX_X, float eps, floa
     rp_parIndex();
     cout << "Build index time = " << chrono::duration_cast<chrono::milliseconds>(chrono::steady_clock::now() - begin).count() << "[ms]" << endl;
 
-    // Try several 5 eps
-    int numTrials = 5;
-    for (int i = 0; i < numTrials; ++i)
+    // Try several n_tests
+    for (int i = 0; i < n_tests; ++i)
     {
         float new_eps = eps + 1.0 * i * rangeEps;
 
@@ -999,15 +1019,17 @@ void sDbscan::test_sDbscan(const Ref<const MatrixXf> & MATRIX_X, float eps, floa
  *
  * @param MATRIX_X
  * @param eps
- * @param rangeEps: We repeat 5 times, each use eps + i * rangeEps
+ * @param rangeEps: We repeat n_tests times, each use eps + i * rangeEps
+ * @param n_tests
  * @param minPts
  */
-void sDbscan::load_test_sDbscan(const string& dataset, float eps, float rangeEps, int minPts)
+void sDbscan::load_test_sDbscan(const string& dataset, float eps, float rangeEps, int n_tests, int minPts)
 {
     cout << "base eps: " << eps << endl;
     cout << "range eps: " << rangeEps << endl;
+    cout << "n_tests: " << n_tests << endl;
     cout << "minPts: " << minPts << endl;
-    cout << "dataset filename" << dataset << endl;
+    cout << "dataset: " << dataset << endl;
 
     cout << "n_points: " << sDbscan::n_points << endl;
     cout << "n_features: " << sDbscan::n_features << endl;
@@ -1038,8 +1060,7 @@ void sDbscan::load_test_sDbscan(const string& dataset, float eps, float rangeEps
     cout << "Build index time = " << chrono::duration_cast<chrono::milliseconds>(chrono::steady_clock::now() - begin).count() << "[ms]" << endl;
 
     // Try several eps
-    int numTrials = 5;
-    for (int i = 0; i < numTrials; ++i)
+    for (int i = 0; i < n_tests; ++i)
     {
         float new_eps = eps + 1.0 * i * rangeEps;
 
@@ -1141,10 +1162,11 @@ void sDbscan::fit_sngDbscan(const Ref<const MatrixXf> & MATRIX_X, float eps, int
  * @param rangeEps: We repeat 5 times, each use eps + i * rangeEps
  * @param minPts
  */
-void sDbscan::test_sngDbscan(const Ref<const MatrixXf> & MATRIX_X, float eps, float rangeEps, int minPts)
+void sDbscan::test_sngDbscan(const Ref<const MatrixXf> & MATRIX_X, float eps, float rangeEps, int n_tests, int minPts)
 {
     cout << "base eps: " << eps << endl;
     cout << "range eps: " << rangeEps << endl;
+    cout << "n_tests: " << n_tests << endl;
     cout << "minPts: " << minPts << endl;
 
     cout << "minPts: " << minPts << endl;
@@ -1167,8 +1189,7 @@ void sDbscan::test_sngDbscan(const Ref<const MatrixXf> & MATRIX_X, float eps, fl
     sDbscan::verbose = true; // set true since we want to test
 
     // Try several eps
-    int numTrials = 5;
-    for (int i = 0; i < numTrials; ++i)
+    for (int i = 0; i < n_tests; ++i)
     {
         float new_eps = eps + 1.0 * i * rangeEps;
 
@@ -1203,12 +1224,13 @@ void sDbscan::test_sngDbscan(const Ref<const MatrixXf> & MATRIX_X, float eps, fl
  * @param rangeEps: We repeat 5 times, each use eps + i * rangeEps
  * @param minPts
  */
-void sDbscan::load_test_sngDbscan(const string& dataset, float eps, float rangeEps, int minPts)
+void sDbscan::load_test_sngDbscan(const string& dataset, float eps, float rangeEps, int n_tests, int minPts)
 {
     cout << "base eps: " << eps << endl;
     cout << "range eps: " << rangeEps << endl;
+    cout << "n_tests: " << n_tests << endl;
     cout << "minPts: " << minPts << endl;
-    cout << "dataset filename" << dataset << endl;
+    cout << "dataset: " << dataset << endl;
 
     cout << "minPts: " << minPts << endl;
     cout << "n_points: " << sDbscan::n_points << endl;
@@ -1230,8 +1252,7 @@ void sDbscan::load_test_sngDbscan(const string& dataset, float eps, float rangeE
     cout << "Loading data time = " << chrono::duration_cast<chrono::milliseconds>(chrono::steady_clock::now() - begin).count() << "[ms]" << endl;
 
     // Try several eps
-    int numTrials = 5;
-    for (int i = 0; i < numTrials; ++i)
+    for (int i = 0; i < n_tests; ++i)
     {
         float new_eps = eps + 1.0 * i * rangeEps;
 
@@ -1424,7 +1445,6 @@ void sDbscan::rp_findCoreDist(float eps, int minPts)
 
 
 }
-
 
 /**
  * Finding core points and its approximate neighborhood and approximate core distance using random sampling

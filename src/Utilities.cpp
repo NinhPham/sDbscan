@@ -4,156 +4,6 @@
 #include <fstream> // fscanf, fopen, ofstream
 #include <sstream>
 
-
-/**
- * WOR sampling index from vectorIndex
- * Use Fisher-Yates shuffle algorithm
- *
- * @param vectorIndex
- * @param K
- * @return random k indexes
- */
-//vector<int> samplingWOR(vector<int> vectorIndex, int K)
-//{
-//    if ( K >= (int)vectorIndex.size() )
-//        return vectorIndex;
-//
-//    vector<int>::iterator iterFirst, iterRandom;
-//    iterFirst = vectorIndex.begin();
-//    int left = vectorIndex.size() - 1;
-//
-//    /**
-//    int i, j;
-//    for (i = K - 1; i > 0; i--)
-//    {
-//        // Pick a random index from 0 to i
-//        j = rand() % (i + 1);
-//
-//        // Swap arr[i] with the element
-//        // at random index
-//        iter_swap(vectorIndex.begin() + i, vectorIndex.begin() + j);
-//    }
-//
-//    return vector<int>(vectorIndex.begin(), vectorIndex.begin() + K);
-//    **/
-//
-//    while (K--)
-//    {
-//        //cout << *iterFirst << endl;
-//        iterRandom = iterFirst;
-//
-//        // increment iterRandom by a random position
-////        advance(iterRandom, intUnifRand(0, left - 1));
-//        advance(iterRandom, rand() % left);
-//
-//        //cout << *iterRandom << endl;
-//        // Swap value
-//        swap(*iterFirst, *iterRandom);
-//        //cout << *iterFirst << endl;
-//        //cout << *iterRandom << endl;
-//
-//        // Increase the iterFirst
-//        ++iterFirst;
-//
-//        // Decrease the size of vector
-//        --left;
-//    }
-//
-//    return vector<int>(vectorIndex.begin(), iterFirst);
-//
-//}
-
-/**
- * Generate random bit for FHT
- *
- * @param p_iNumBit
- * @param bitHD
- * @param random_seed
- * return bitHD that contains fhtDim * n_rotate (default of n_rotate = 3)
- */
-void bitHD3Generator(int p_iNumBit, boost::dynamic_bitset<> & bitHD, int random_seed)
-{
-    unsigned seed = chrono::system_clock::now().time_since_epoch().count();
-    if (random_seed >= 0)
-        seed = random_seed;
-
-    default_random_engine generator(seed);
-    uniform_int_distribution<uint32_t> unifDist(0, 1);
-
-    bitHD = boost::dynamic_bitset<> (p_iNumBit);
-
-    // Loop col first since we use col-wise
-    for (int d = 0; d < p_iNumBit; ++d)
-    {
-        bitHD[d] = unifDist(generator) & 1;
-    }
-
-}
-
-/**
- * Generate Gaussian distribution N(mean, stddev)
- *
- * @param p_iNumRows
- * @param p_iNumCols
- * @param mean
- * @param stddev
- * @param random_seed
- * @return a matrix of size numRow x numCol
- */
-MatrixXf gaussGenerator(int p_iNumRows, int p_iNumCols, float mean, float stddev, int random_seed)
-{
-    MatrixXf MATRIX_G = MatrixXf::Zero(p_iNumRows, p_iNumCols);
-
-    unsigned seed = chrono::system_clock::now().time_since_epoch().count();
-    if (random_seed >= 0)
-        seed = random_seed;
-
-    default_random_engine generator(seed);
-
-    normal_distribution<float> normDist(mean, stddev);
-
-//    MATRIX_G = MatrixXf::Zero(p_iNumRows, p_iNumCols);
-
-    // Always iterate col first, then row later due to the col-wise storage
-    for (int c = 0; c < p_iNumCols; ++c)
-        for (int r = 0; r < p_iNumRows; ++r)
-            MATRIX_G(r, c) = normDist(generator);
-
-    return MATRIX_G;
-}
-
-/**
- * Generate Cauchy distribution C(x0, gamma)
- *
- * @param p_iNumRows
- * @param p_iNumCols
- * @param x0
- * @param gamma
- * @param random_seed
- * @return a matrix of size numRow x numCol
- */
-MatrixXf cauchyGenerator(int p_iNumRows, int p_iNumCols, float x0, float gamma, int random_seed)
-{
-    MatrixXf MATRIX_C = MatrixXf::Zero(p_iNumRows, p_iNumCols);
-
-    unsigned seed = chrono::system_clock::now().time_since_epoch().count();
-    if (random_seed >= 0)
-        seed = random_seed;
-
-    default_random_engine generator(seed);
-
-    cauchy_distribution<float> cauchyDist(x0, gamma); // {x0 /* a */, 𝛾 /* b */}
-
-//    MATRIX_C = MatrixXf::Zero(p_iNumRows, p_iNumCols);
-
-    // Always iterate col first, then row later due to the col-wise storage
-    for (int c = 0; c < p_iNumCols; ++c)
-        for (int r = 0; r < p_iNumRows; ++r)
-            MATRIX_C(r, c) = cauchyDist(generator);
-
-    return MATRIX_C;
-}
-
 /**
  *
  * @param p_Labels
@@ -195,165 +45,6 @@ void outputOptics(const IVector & p_vecOrder, const FVector & p_vecDist, const s
 
     myfile.close();
 //	cout << "Done" << endl;
-}
-
-/**
- *
- * @param p_vecPoint
- * @param p_vecEmbed
- * @param kerEmbed
- * @param numDim
- * @param kerIntervalSamp
- */
-void embedChi2(const Ref<VectorXf>& p_vecPoint, Ref<VectorXf> p_vecEmbed,
-                    int kerEmbed, int numDim, float kerIntervalSamp)
-{
-    int iComponent = (kerEmbed / numDim) - 1; // kappa_1, kappa_2, ...
-    iComponent /= 2; // since we take cos and sin
-
-//    cout << "Number of components: " << iComponent << endl;
-
-    // adding sqrt(x L kappa(0)
-    for (int d = 0; d < numDim; ++d)
-    {
-        // Only deal with non zero
-        if (p_vecPoint[d] > 0)
-            p_vecEmbed[d] = sqrt(p_vecPoint[d] * kerIntervalSamp);
-    }
-
-    // adding other component
-    for (int i = 1; i <= iComponent; ++i)
-    {
-        // We need the first D for kappa_0, 2D for kappa_1, 2D for kappa_2, ...
-        int iBaseIndex = numDim + (i - 1) * 2 * numDim;
-
-        for (int d = 0; d < numDim; ++d)
-        {
-            if (p_vecPoint[d] > 0)
-            {
-                float fFactor = sqrt(2.0 * p_vecPoint[d] * kerIntervalSamp / cosh(PI * i * kerIntervalSamp));
-
-                p_vecEmbed[iBaseIndex + d] = fFactor * cos(i * kerIntervalSamp * log(p_vecPoint[d]));
-                p_vecEmbed[iBaseIndex + numDim + d] = fFactor * sin(i * kerIntervalSamp * log(p_vecPoint[d]));
-            }
-        }
-    }
-}
-
-/**
- *
- * @param p_vecPoint
- * @param p_vecEmbed
- * @param kerEmbed
- * @param numDim
- * @param kerIntervalSamp
- */
-void embedJS(const Ref<VectorXf>& p_vecPoint, Ref<VectorXf> p_vecEmbed,
-             int kerEmbed, int numDim, float kerIntervalSamp)
-{
-    int iComponent = (kerEmbed / numDim) - 1; // kappa_1, kappa_2, ...
-    iComponent /= 2; // since we take cos and sin
-
-    // adding sqrt(x L kappa(0)
-    for (int d = 0; d < numDim; ++d)
-    {
-        // Only deal with non zero
-        if (p_vecPoint[d] > 0)
-            p_vecEmbed[d] = sqrt(p_vecPoint[d] * kerIntervalSamp * 2.0 / log(4));
-    }
-
-    // adding other component
-    for (int i = 1; i <= iComponent; ++i)
-    {
-        // We need the first D for kappa_0, 2D for kappa_1, 2D for kappa_2, ...
-        int iBaseIndex = numDim + (i - 1) * 2 * numDim;
-
-        for (int d = 0; d < numDim; ++d)
-        {
-            if (p_vecPoint[d] > 0)
-            {
-                // this is kappa(jL)
-                float fFactor = 2.0 / (log(4) * (1 + 4 * (i * kerIntervalSamp) * (i * kerIntervalSamp)) * cosh(PI * i * kerIntervalSamp));
-
-                // This is sqrt(2X hkappa)
-                fFactor = sqrt(2.0 * p_vecPoint[d] * kerIntervalSamp * fFactor);
-
-                p_vecEmbed[iBaseIndex + d] = fFactor * cos(i * kerIntervalSamp * log(p_vecPoint[d]));
-                p_vecEmbed[iBaseIndex + numDim + d] = fFactor * sin(i * kerIntervalSamp * log(p_vecPoint[d]));
-            }
-        }
-    }
-}
-
-/** Useful for dense vector
-**/
-float computeDist(const Ref<VectorXf> & p_vecX, const Ref<VectorXf> & p_vecY, const string& dist)
-{
-    if (dist == "Cosine")
-        return 1 - p_vecX.dot(p_vecY);
-    if (dist == "L1")
-        return (p_vecX - p_vecY).cwiseAbs().sum();
-    else if (dist == "L2")
-        return (p_vecX - p_vecY).norm();
-    else if (dist == "Chi2") // ChiSquare
-    {
-        // hack for vectorize to ensure no zero element
-        VectorXf vecX = p_vecX;
-        VectorXf vecY = p_vecY;
-
-        vecX.array() += EPSILON;
-        vecY.array() += EPSILON;
-
-        VectorXf temp = vecX.cwiseProduct(vecY); // x * y
-        temp = temp.cwiseQuotient(vecX + vecY); // (x * y) / (x + y)
-        temp.array() *= 2.0; // 2(x * y) / (x + y)
-
-        return 1.0 - temp.sum();
-    }
-
-    else if (dist == "JS") // Jensen Shannon
-    {
-        // hack for vectorize
-        VectorXf vecX = p_vecX;
-        VectorXf vecY = p_vecY;
-
-        vecX.array() += EPSILON;
-        vecY.array() += EPSILON;
-
-        VectorXf vecTemp1 = (vecX + vecY).cwiseQuotient(vecX); // (x + y) / x
-        vecTemp1 = vecTemp1.array().log() / log(2.0); // log2( (x+y) / x))
-        vecTemp1 = vecTemp1.cwiseProduct(vecX); // x * log2( (x+y) / x))
-
-//        cout << vecTemp1.sum() / 2 << endl;
-
-        VectorXf vecTemp2 = (vecX + vecY).cwiseQuotient(vecY);
-        vecTemp2 = vecTemp2.array().log() / log(2.0);
-        vecTemp2 = vecTemp2.cwiseProduct(vecY);
-
-//        cout << vecTemp2.sum() / 2 << endl;
-
-        return 1.0 - (vecTemp1 + vecTemp2).sum() / 2.0;
-    }
-    else
-    {
-        cout << "Error: The distance is not support" << endl;
-        return 0;
-    }
-}
-
-/** Faster with sparse representation
-**/
-float computeChi2(const Ref<VectorXf>& vecX, const Ref<VectorXf>& vecY)
-{
-    float dist = 0.0;
-    for (int d = 0; d < vecX.size(); ++d)
-    {
-        if ((vecX(d) > 0) && (vecY(d) > 0))
-            dist += 2 * vecX(d) * vecY(d) / (vecX(d) + vecY(d));
-    }
-
-    return 1.0 - dist;
-
 }
 
 /**
@@ -408,53 +99,7 @@ void loadtxtData(const string& dataset, const string& distance, int numPoints, i
  * @param MATRIX_X
  * @param distance
  */
-void transformData(MatrixXf & MATRIX_X, const string& distance)
-{
-    // Check support distance
-    // Doing cross-check for normalize points with cosine, and non-negative values for Chi2 and JS
-    int numPoints = MATRIX_X.cols();
 
-    if (distance == "Cosine")
-    {
-#pragma omp parallel for
-        for (int n = 0; n < numPoints; ++n)
-            MATRIX_X.col(n) /= MATRIX_X.col(n).norm(); // or MATRIX_X.colwise().normalize() inplace but not work with multi-threading
-
-//        cout << MATRIX_X.col(0).norm() << endl;
-//        cout << MATRIX_X.col(10).norm() << endl;
-//        cout << MATRIX_X.col(100).norm() << endl;
-    }
-    else if ((distance == "Chi2") || (distance == "JS"))
-    {
-        // Ensure non-negative
-        if (MATRIX_X.minCoeff() < 0)
-        {
-            cerr << "Error: X is not non-negative !" << endl;
-            exit(1);
-        }
-        else // normalize to have sum = 1
-        {
-            // Get colwise.sum is a row array, need to transpose() to make it col array
-#pragma omp parallel for
-            for (int n = 0; n < numPoints; ++n)
-            {
-                float fSum = MATRIX_X.col(n).sum();
-                if (fSum <= 0)
-                {
-                    cerr << "Error: There is an zero point !" << endl;
-                    exit(1);
-                }
-                MATRIX_X.col(n) /= fSum;
-            }
-
-            // Test
-//            cout << MATRIX_X.col(0).sum() << endl;
-//            cout << MATRIX_X.col(10).sum() << endl;
-//            cout << MATRIX_X.col(100).sum() << endl;
-        }
-    }
-
-}
 
 /*
  * @param nargs:
@@ -609,32 +254,32 @@ void readParam_sDbscan(int nargs, char** args, sDbscanParam& sParam) {
     bSuccess = false;
     for (int i = 1; i < nargs; i++) {
         if (strcmp(args[i], "--topK") == 0) {
-            sParam.topK = atoi(args[i + 1]);
-            cout << "TopK closest/furthest vectors: " << sParam.topK << endl;
+            sParam.topVectors = atoi(args[i + 1]);
+            cout << "TopK closest/furthest vectors: " << sParam.topVectors << endl;
             bSuccess = true;
             break;
         }
     }
 
     if (!bSuccess) {
-        sParam.topK = 5;
-        cout << "TopK is missing. Use default topK: " << sParam.topK << endl;
+        sParam.topVectors = 5;
+        cout << "TopK is missing. Use default topK: " << sParam.topVectors << endl;
     }
 
     // m >= MinPts
     bSuccess = false;
     for (int i = 1; i < nargs; i++) {
         if (strcmp(args[i], "--topM") == 0) {
-            sParam.topM = atoi(args[i + 1]);
-            cout << "TopM: " << sParam.topM << endl;
+            sParam.topPoints = atoi(args[i + 1]);
+            cout << "TopM: " << sParam.topPoints << endl;
             bSuccess = true;
             break;
         }
     }
 
     if (!bSuccess) {
-        sParam.topM = sParam.minPts;
-        cout << "TopM is missing. Use default TopM = minPts = " << sParam.topM << endl;
+        sParam.topPoints = sParam.minPts;
+        cout << "TopM is missing. Use default TopM = minPts = " << sParam.topPoints << endl;
     }
 
 
