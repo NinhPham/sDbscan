@@ -16,6 +16,26 @@ inline string int2str(int x)
     return ss.str();
 }
 
+// https://stackoverflow.com/questions/9411823/fast-log2float-x-implementation-c
+inline float fast_log2 (float val)
+{
+    int * const    exp_ptr = reinterpret_cast <int *> (&val);
+    int            x = *exp_ptr;
+    const int      log_2 = ((x >> 23) & 255) - 128;
+    x &= ~(255 << 23);
+    x += 127 << 23;
+    *exp_ptr = x;
+
+    val = ((-1.0f/3) * val + 2) * val - 2.0f/3;   // (1)
+
+    return (val + log_2);
+}
+
+inline float fast_log (const float &val)
+{
+    return (fast_log2 (val) * 0.69314718f);
+}
+
 /**
  * Generate random bit for FHT
  *
@@ -251,9 +271,9 @@ inline float computeDist(const Ref<VectorXf> & p_vecX, const Ref<VectorXf> & p_v
         {
 //            if ((p_vecX(d) > 0) && (p_vecY(d) > 0))
 //            {
-                temp += (p_vecX(d) + p_vecY(d) + 2 * EPSILON) * log2(p_vecX(d) + p_vecY(d) + 2 * EPSILON)
-                        -  (p_vecX(d) + EPSILON) * log2(p_vecX(d) + EPSILON)
-                        -  (p_vecY(d) + EPSILON) * log2(p_vecY(d) + EPSILON);
+                temp += (p_vecX(d) + p_vecY(d) + 2 * EPSILON) * fast_log2(p_vecX(d) + p_vecY(d) + 2 * EPSILON)
+                        -  (p_vecX(d) + EPSILON) * fast_log2(p_vecX(d) + EPSILON)
+                        -  (p_vecY(d) + EPSILON) * fast_log2(p_vecY(d) + EPSILON);
 //            }
         }
 

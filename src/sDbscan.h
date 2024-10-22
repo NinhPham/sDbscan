@@ -76,8 +76,11 @@ public:
     }
 
     void set_params(int numProj = 1024, int k = 5, int m = 50, string dist = "Cosine",
-                   int kerDim = 1024, float kerSigma = 1.0, float kerSam = 0.4, float prob = 0.01, int noiseClustering = 0,
-                   bool ver = false, int numThreads = 8, int randomSeed = -1, string filename = ""){
+                    int kerDim = 1024, float kerSigma = 1.0, float kerSam = 0.4,
+                    int noiseClustering = 0, float prob = 0.01,
+                    bool ver = false, string filename = "",
+                    int numThreads = 8, int randomSeed = -1)
+    {
         n_proj = numProj;
         topK = k;
         topM = m;
@@ -103,9 +106,25 @@ public:
         fhtDim = 1 << int(ceil(log2(max(n_proj, ker_n_features))));
     }
 
+    void set_kernel_params(string dist = "L2", int kerDim = 1024, float kerSigma = 1.0, float kerSam = 0.4)
+    {
+        distance = dist;
+        ker_n_features = kerDim;
+        ker_sigma = kerSigma;
+        ker_intervalSampling = kerSam;
+
+        // Cosine does not need kernel embeddings
+        if (distance == "Cosine") {
+            ker_n_features = n_features;
+        }
+
+        // Note that: We do not implement FHT for L2 random features
+        fhtDim = 1 << int(ceil(log2(max(n_proj, ker_n_features))));
+    }
+
     // We provide our own sngDbscan
     void set_sngParams(string dist = "Cosine", float prob = 0.01, int noiseClustering = 0,
-                      bool ver = false, int numThreads = -1, int randomSeed = -1, string filename = ""){
+                      bool ver = false, string filename = "", int numThreads = -1, int randomSeed = -1){
 
         distance = dist;
         samplingProb = prob;
@@ -132,6 +151,8 @@ public:
         matrix_topK.resize(0, 0); // For each point (each col), keep topK closest/furthest random vectors
         matrix_topM.resize(0, 0); // For each random vector (each col), keep topM closest/furthest points
 
+        bitHD3.clear();
+
         // Data structures of sDbscan
         vec2D_Neighbors.clear(); // vector of approx neighborhoods
         vec2D_NeighborDist.clear(); // vector of approx neighborhoods and its distances
@@ -139,6 +160,7 @@ public:
         bit_CorePoints.clear(); // bitarray storing core points
         vec_CoreDist.clear();
     }
+
     ~sDbscan(){
         matrix_X.resize(0, 0);
         clear();

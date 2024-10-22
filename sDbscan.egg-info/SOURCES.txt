@@ -10,5 +10,6 @@ sDbscan.egg-info/top_level.txt
 src/Utilities.cpp
 src/fast_copy.c
 src/fht.c
+src/main.cpp
 src/sDbscan.cpp
 test/test_sDbscan.py

@@ -16,23 +16,32 @@ PYBIND11_MODULE(sDbscan, m) { // Must be the same name with class Dbscan
         .def(py::init<const int&, const int&>(),  py::arg("n_points"), py::arg("n_features"))
         .def("set_params", &sDbscan::set_params,
             py::arg("n_proj") = 1024, py::arg("topK") = 10, py::arg("topM") = 50,
-            py::arg("distance") = "Cosine", py::arg("ker_n_features") = 1024, py::arg("ker_sigma") = 1.0,
-            py::arg("ker_intervalSampling") = 0.4, py::arg("samplingProb") = 0.01,  py::arg("clusterNoise") = 0,
-            py::arg("verbose") = false, py::arg("n_threads") = -1, py::arg("random_seed") = -1, py::arg("output") = ""
+            py::arg("distance") = "Cosine",
+            py::arg("ker_n_features") = 1024, py::arg("ker_sigma") = 1.0, py::arg("ker_intervalSampling") = 0.4,
+            py::arg("clusterNoise") = 0, py::arg("samplingProb") = 0.01,
+            py::arg("verbose") = false, py::arg("output") = "",
+            py::arg("n_threads") = -1, py::arg("random_seed") = -1
         )
+
         .def("set_sngParams", &sDbscan::set_sngParams,
         py::arg("distance") = "Cosine", py::arg("samplingProb") = 0.01, py::arg("clusterNoise") = 0,
-        py::arg("verbose") = false, py::arg("n_threads") = -1, py::arg("random_seed") = -1, py::arg("output") = ""
+        py::arg("verbose") = false, py::arg("output") = "", py::arg("n_threads") = -1, py::arg("random_seed") = -1
         )
+
         .def_readonly("labels_", &sDbscan::labels_) // must be def_readonly
         .def_readonly("n_clusters_", &sDbscan::n_clusters_) // must be def_readonly
         .def_readonly("ordering_", &sDbscan::ordering_) // must be def_readonly
         .def_readonly("reachability_", &sDbscan::reachability_) // must be def_readonly
+
+        .def("clear", &sDbscan::clear)
+
         .def("set_topM", &sDbscan::set_topM, py::arg("topM"))
         .def("set_threads", &sDbscan::set_threads, py::arg("n_threads"))
         .def("set_clusterNoise", &sDbscan::set_clusterNoise, py::arg("clusterNoise"))
-        .def("clear", &sDbscan::clear)
         .def("set_topK", &sDbscan::set_topK, py::arg("topK"))
+        .def("set_kernel_params", &sDbscan::set_kernel_params, py::arg("distance") = "L2",
+            py::arg("ker_n_features") = 1024, py::arg("ker_sigma") = 1.0, py::arg("ker_intervalSampling") = 0.4
+        )
 
         // sDbscan
         .def("fit_sDbscan", &sDbscan::fit_sDbscan, py::arg("X"), py::arg("eps"), py::arg("minPts"))

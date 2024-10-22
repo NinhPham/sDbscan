@@ -1,6 +1,5 @@
 import numpy as np
 import math
-from sklearn.metrics import adjusted_rand_score, adjusted_mutual_info_score, normalized_mutual_info_score
 from matplotlib import pyplot as plt
 
 # Finding top-k distance of a few points
@@ -11,7 +10,7 @@ from matplotlib import pyplot as plt
 
 def plot_sOptics():
     
-    path = "/home/npha145/Dropbox (Uni of Auckland)/Working/_Code/C++/sDbscan/test/data/"
+    path = "sDbscan/test/data/"
     dataset = np.loadtxt(path + 'mnist_all_X')
 
     dataset_t = np.transpose(dataset)
@@ -30,7 +29,7 @@ def plot_sOptics():
     dist = "Cosine"
     clusterNoise = 0
     output = 'sOptics'
-    numThreads = 64
+    numThreads = -1
     verbose = False
     intervalSampling = 0.4
     samplingRatio = 0.01
@@ -39,7 +38,7 @@ def plot_sOptics():
     import sDbscan
 
     dbs = sDbscan.sDbscan(n, d)
-    dbs.setParams(numProj, k, m, dist, numEmbed, sigma, intervalSampling, samplingRatio, clusterNoise, verbose, numThreads, seed, output)
+    dbs.setParams(numProj, k, m, dist, numEmbed, sigma, intervalSampling, clusterNoise, samplingRatio, verbose, output, numThreads, seed)
 
     start = timeit.default_timer()
     dbs.fit_sOptics(dataset_t, 0.25, 50)

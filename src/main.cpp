@@ -22,9 +22,11 @@ int main(int nargs, char** args)
     readParam_sDbscan(nargs, args, sParam);
 
     sDbscan dbscan(sParam.n_points, sParam.n_features);
-    dbscan.set_params(sParam.n_proj, sParam.topVectors, sParam.topPoints, sParam.distance, sParam.ker_n_features,
-                      sParam.ker_sigma, sParam.ker_intervalSampling, sParam.samplingProb,
-                      sParam.clusterNoise, sParam.verbose, sParam.n_threads, sParam.seed, sParam.output);
+    dbscan.set_params(sParam.n_proj, sParam.topVectors, sParam.topPoints, sParam.distance,
+                      sParam.ker_n_features, sParam.ker_sigma, sParam.ker_intervalSampling,
+                      sParam.clusterNoise, sParam.samplingProb,
+                      sParam.verbose, sParam.output,
+                      sParam.n_threads, sParam.seed);
 
     // Read data
     string dataset = "";
