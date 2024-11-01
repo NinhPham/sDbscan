@@ -4,7 +4,7 @@
 
 #include "sDbscan.h"
 #include "Utilities.h"
-#include <mutex>
+//#include <mutex>
 
 
 /**
@@ -222,12 +222,6 @@ void sDbscan::rp_findCorePoints(float eps, int minPts)
 
     sDbscan::vec2D_Neighbors = vector<IVector> (sDbscan::n_points, IVector());
 
-    // Preallocate space in each inner vector to avoid resizing during parallel writes
-//    for (int n = 0; n < sDbscan::n_points; ++n) {
-//        sDbscan::vec2D_Neighbors[n].reserve(minPts); // Reserve space to avoid reallocation
-//    }
-
-//    vector<mutex> vecLocks(sDbscan::n_points);
 
 
     // bitset work since # core points tend to be relatively large compared to n_points
@@ -239,7 +233,7 @@ void sDbscan::rp_findCorePoints(float eps, int minPts)
     // Initialize the OPENMP lock
 //    omp_lock_t ompLock;
 //    omp_init_lock(&ompLock);
-
+//    vector<mutex> vecLocks(sDbscan::n_points);
 
 
     //TODO: If single thread, then we can improve if we store (X1, X2) s.t. <X1,X2> >= threshold
