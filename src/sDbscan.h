@@ -52,6 +52,7 @@ protected:
 
     // Data structures of Dbscan
     vector<IVector> vec2D_Neighbors; // vector of approx neighborhoods
+
     boost::dynamic_bitset<> bit_CorePoints; // bitarray storing core points
 
     // Data structures of Optics

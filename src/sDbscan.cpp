@@ -4,6 +4,8 @@
 
 #include "sDbscan.h"
 #include "Utilities.h"
+#include <mutex>
+
 
 /**
  * Maintain the projection matrix MATRIX_FHT for parallel processing.
@@ -82,6 +84,7 @@ void sDbscan::rp_parIndex()
 
             // Multiple with Hadamard matrix by calling FWHT transform
             fht_float(vecRotation.data(), log2Project);
+            // FWHT(vecRotation);
         }
 
         // Store projection matrix for faster parallel, and no need to scale since we keep top-k and top-MinPts
@@ -215,7 +218,17 @@ void sDbscan::rp_findCorePoints(float eps, int minPts)
 {
     // Space and time overheads of unordered_set<int> are significant compared to vector since we only has approximate 2km neighbors
     // In case we add x to q's neighbor, and q to x's neighbor, # neighbors > 2km
+
+
     sDbscan::vec2D_Neighbors = vector<IVector> (sDbscan::n_points, IVector());
+
+    // Preallocate space in each inner vector to avoid resizing during parallel writes
+//    for (int n = 0; n < sDbscan::n_points; ++n) {
+//        sDbscan::vec2D_Neighbors[n].reserve(minPts); // Reserve space to avoid reallocation
+//    }
+
+//    vector<mutex> vecLocks(sDbscan::n_points);
+
 
     // bitset work since # core points tend to be relatively large compared to n_points
     sDbscan::bit_CorePoints = boost::dynamic_bitset<>(sDbscan::n_points);
@@ -226,6 +239,8 @@ void sDbscan::rp_findCorePoints(float eps, int minPts)
     // Initialize the OPENMP lock
 //    omp_lock_t ompLock;
 //    omp_init_lock(&ompLock);
+
+
 
     //TODO: If single thread, then we can improve if we store (X1, X2) s.t. <X1,X2> >= threshold
 
@@ -285,6 +300,21 @@ void sDbscan::rp_findCorePoints(float eps, int minPts)
                             vec2D_Neighbors[iPointIdx].push_back(n); // e.g. 1 = {3, 5}, and 3 = {1 6}
 //                            omp_unset_lock(&ompLock);
                         }
+
+//                            {
+//                                std::lock_guard<std::mutex> lock(vecLocks[n]);
+//                                vec2D_Neighbors[n].push_back(iPointIdx); // allow duplicate, at most double so vector is much faster than set()
+//                                // Mutex is automatically released when `guard` goes out of scope
+//                            }
+//
+//                            {
+//                                std::lock_guard<std::mutex> lock(vecLocks[iPointIdx]);
+//                                vec2D_Neighbors[iPointIdx].push_back(n); // allow duplicate, at most double so vector is much faster than set()
+//                                // Mutex is automatically released when `guard` goes out of scope
+//                            }
+
+
+
                     }
 
                 }
@@ -334,7 +364,10 @@ void sDbscan::rp_findCorePoints(float eps, int minPts)
 //        cout << "Number of used distances for the point of " << n << " is: " << approxNeighbor.size() << endl;
     }
 
+
+
 //    omp_destroy_lock(&ompLock);
+//    vecLocks.clear();
 
 //    if (sDbscan::verbose)
 //        cout << "Find neighborhood time = " << chrono::duration_cast<chrono::milliseconds>(chrono::steady_clock::now() - begin).count() << "[ms]" << endl;

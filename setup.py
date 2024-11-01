@@ -16,6 +16,7 @@ __version__ = "0.0.2"
 #   Sort input source files if you glob sources to ensure bit-for-bit
 #   reproducible builds (https://github.com/pybind/python_example/pull/53)
 
+
 use_openmp = sys.platform != 'darwin'
 extra_args = ['-std=c++17', '-march=native', '-O3', '-fopenmp']
 extra_link_args = []
@@ -24,7 +25,7 @@ if use_openmp:
     extra_args += ['-fopenmp']
     extra_link_args += ['-fopenmp']
 if sys.platform == 'darwin':
-    extra_args += ['-mmacosx-version-min=10.9', '-stdlib=libc++']
+    extra_args += ['-mmacosx-version-min=10.9', '-stdlib=libc++', '-mcpu=apple-m2']
     os.environ['LDFLAGS'] = '-mmacosx-version-min=10.9'
 
 ext_modules = [

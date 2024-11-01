@@ -17,24 +17,24 @@ inline string int2str(int x)
 }
 
 // https://stackoverflow.com/questions/9411823/fast-log2float-x-implementation-c
-inline float fast_log2 (float val)
-{
-    int * const    exp_ptr = reinterpret_cast <int *> (&val);
-    int            x = *exp_ptr;
-    const int      log_2 = ((x >> 23) & 255) - 128;
-    x &= ~(255 << 23);
-    x += 127 << 23;
-    *exp_ptr = x;
-
-    val = ((-1.0f/3) * val + 2) * val - 2.0f/3;   // (1)
-
-    return (val + log_2);
-}
-
-inline float fast_log (const float &val)
-{
-    return (fast_log2 (val) * 0.69314718f);
-}
+//inline float fast_log2 (float val)
+//{
+//    int * const    exp_ptr = reinterpret_cast <int *> (&val);
+//    int            x = *exp_ptr;
+//    const int      log_2 = ((x >> 23) & 255) - 128;
+//    x &= ~(255 << 23);
+//    x += 127 << 23;
+//    *exp_ptr = x;
+//
+//    val = ((-1.0f/3) * val + 2) * val - 2.0f/3;   // (1)
+//
+//    return (val + log_2);
+//}
+//
+//inline float fast_log (const float &val)
+//{
+//    return (fast_log2 (val) * 0.69314718f);
+//}
 
 /**
  * Generate random bit for FHT
@@ -245,39 +245,39 @@ inline float computeDist(const Ref<VectorXf> & p_vecX, const Ref<VectorXf> & p_v
     else if (dist == "JS") // Jensen Shannon
     {
         // hack for vectorize
-//        VectorXf vecX = p_vecX;
-//        VectorXf vecY = p_vecY;
-//
-//        vecX.array() += EPSILON;
-//        vecY.array() += EPSILON;
-//
-//        VectorXf vecTemp1 = (vecX + vecY).cwiseQuotient(vecX); // (x + y) / x
-//        vecTemp1 = vecTemp1.array().log() / log(2.0); // log2( (x+y) / x))
-//        vecTemp1 = vecTemp1.cwiseProduct(vecX); // x * log2( (x+y) / x))
-//
-////        cout << vecTemp1.sum() / 2 << endl;
-//
-//        VectorXf vecTemp2 = (vecX + vecY).cwiseQuotient(vecY); // (x + y) / y
-//        vecTemp2 = vecTemp2.array().log() / log(2.0); // log2( (x+y) / y))
-//        vecTemp2 = vecTemp2.cwiseProduct(vecY); // y * log2( (x+y) / y))
-//
-////        cout << vecTemp2.sum() / 2 << endl;
-//
-//        return 1.0 - (vecTemp1 + vecTemp2).sum() / 2.0;
+        VectorXf vecX = p_vecX;
+        VectorXf vecY = p_vecY;
+
+        vecX.array() += EPSILON;
+        vecY.array() += EPSILON;
+
+        VectorXf vecTemp1 = (vecX + vecY).cwiseQuotient(vecX); // (x + y) / x
+        vecTemp1 = vecTemp1.array().log() / log(2.0); // log2( (x+y) / x))
+        vecTemp1 = vecTemp1.cwiseProduct(vecX); // x * log2( (x+y) / x))
+
+//        cout << vecTemp1.sum() / 2 << endl;
+
+        VectorXf vecTemp2 = (vecX + vecY).cwiseQuotient(vecY); // (x + y) / y
+        vecTemp2 = vecTemp2.array().log() / log(2.0); // log2( (x+y) / y))
+        vecTemp2 = vecTemp2.cwiseProduct(vecY); // y * log2( (x+y) / y))
+
+//        cout << vecTemp2.sum() / 2 << endl;
+
+        return 1.0 - (vecTemp1 + vecTemp2).sum() / 2.0;
 
         // TODO: Remove EPSILON for JS. It might affect the accuracy since the value of eps will change
-        float temp = 0.0;
-        for (int d = 0; d < p_vecX.size(); ++d)
-        {
-//            if ((p_vecX(d) > 0) && (p_vecY(d) > 0))
-//            {
-                temp += (p_vecX(d) + p_vecY(d) + 2 * EPSILON) * fast_log2(p_vecX(d) + p_vecY(d) + 2 * EPSILON)
-                        -  (p_vecX(d) + EPSILON) * fast_log2(p_vecX(d) + EPSILON)
-                        -  (p_vecY(d) + EPSILON) * fast_log2(p_vecY(d) + EPSILON);
-//            }
-        }
-
-        return 1.0 - temp / 2.0;
+//        float temp = 0.0;
+//        for (int d = 0; d < p_vecX.size(); ++d)
+//        {
+////            if ((p_vecX(d) > 0) && (p_vecY(d) > 0))
+////            {
+//                temp += (p_vecX(d) + p_vecY(d) + 2 * EPSILON) * log2(p_vecX(d) + p_vecY(d) + 2 * EPSILON)
+//                        -  (p_vecX(d) + EPSILON) * log2(p_vecX(d) + EPSILON)
+//                        -  (p_vecY(d) + EPSILON) * log2(p_vecY(d) + EPSILON);
+////            }
+//        }
+//
+//        return 1.0 - temp / 2.0;
     }
     else
     {
@@ -337,12 +337,12 @@ inline void transformData(MatrixXf & MATRIX_X, const string& distance)
 /**
     Convert a = a + b, b = a - b
 **/
-//void inline wht_bfly (float& a, float& b)
-//{
-//    float tmp = a;
-//    a += b;
-//    b = tmp - b;
-//}
+void inline wht_bfly (float& a, float& b)
+{
+    float tmp = a;
+    a += b;
+    b = tmp - b;
+}
 
 /**
     Fast in-place Walsh-Hadamard Transform (http://www.musicdsp.org/showone.php?id=18)
@@ -351,37 +351,37 @@ inline void transformData(MatrixXf & MATRIX_X, const string& distance)
 
     Or: https://github.com/vegarant/fastwht?tab=readme-ov-file
 **/
-//void inline FWHT (Ref<VectorXf> data)
-//{
-//    int n = (int)data.size();
-//    int nlog2 = log2(n);
-//
-//    int l, m;
-//    for (int i = 0; i < nlog2; ++i)
-//    {
-//        l = 1 << (i + 1);
-//        for (int j = 0; j < n; j += l)
-//        {
-//            m = 1 << i;
-//            for (int k = 0; k < m; ++k)
-//            {
-//                //cout << data (j + k) << endl;
-//                data (j + k) = data (j + k);
-//                //cout << data (j + k) << endl;
-//
-//                //cout << data (j + k + m) << endl;
-//                data (j + k + m) = data (j + k + m);
-//                //cout << data (j + k + m) << endl;
-//
-//                wht_bfly (data (j + k), data (j + k + m));
-//                //cout << data (j + k) << endl;
-//                //cout << data (j + k + m) << endl;
-//
-//            }
-//
-//        }
-//    }
-//}
+void inline FWHT (Ref<VectorXf> data)
+{
+    int n = (int)data.size();
+    int nlog2 = log2(n);
+
+    int l, m;
+    for (int i = 0; i < nlog2; ++i)
+    {
+        l = 1 << (i + 1);
+        for (int j = 0; j < n; j += l)
+        {
+            m = 1 << i;
+            for (int k = 0; k < m; ++k)
+            {
+                //cout << data (j + k) << endl;
+                data (j + k) = data (j + k);
+                //cout << data (j + k) << endl;
+
+                //cout << data (j + k + m) << endl;
+                data (j + k + m) = data (j + k + m);
+                //cout << data (j + k + m) << endl;
+
+                wht_bfly (data (j + k), data (j + k + m));
+                //cout << data (j + k) << endl;
+                //cout << data (j + k + m) << endl;
+
+            }
+
+        }
+    }
+}
 
 // Saving
 void outputDbscan(const IVector &, const string&);

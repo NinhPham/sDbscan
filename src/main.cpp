@@ -72,11 +72,11 @@ int main(int nargs, char** args)
     }
 
     // For big data, we might want to call load & fit
-    float eps = 0.25;
-    int minPts = 50;
-
-    dbscan.load_fit_sDbscan(dataset, eps, minPts);
-    dbscan.load_fit_sOptics(dataset, eps, minPts);
+//    float eps = 0.25;
+//    int minPts = 50;
+//
+//    dbscan.load_fit_sDbscan(dataset, eps, minPts);
+//    dbscan.load_fit_sOptics(dataset, eps, minPts);
 
 
 
